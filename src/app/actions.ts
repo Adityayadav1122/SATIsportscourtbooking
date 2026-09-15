@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { bookingErrorMessage } from "@/lib/auth-utils";
+import type { OccupancyRow } from "@/lib/types";
 
 export interface ActionResult<T = void> {
   ok: boolean;
@@ -18,15 +19,25 @@ export async function signOut() {
   redirect("/login");
 }
 
-export async function bookSlot(input: {
-  sport_id: number;
-  booking_date: string;
-  start_time: string;
-}): Promise<ActionResult<{ id: string }>> {
+export type WizardResult =
+  | { kind: "book"; result: ActionResult<{ id: string }> }
+  | { kind: "slots"; result: ActionResult<OccupancyRow[]> };
+
+export async function bookingWizard(
+  input:
+    | { kind: "book"; sport_id: number; booking_date: string; start_time: string }
+    | { kind: "slots"; date: string },
+): Promise<WizardResult> {
+  if (input.kind === "slots") {
+    return { kind: "slots", result: await getAvailableSlotsInternal(input.date) };
+  }
+
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
-    return { ok: false, error: "You must be logged in to book." };
+    return { kind: "book", result: { ok: false, error: "You must be logged in to book." } };
   }
 
   const { data, error } = await supabase.rpc("book_slot", {
@@ -36,15 +47,14 @@ export async function bookSlot(input: {
   });
 
   if (error) {
-    const msg = bookingErrorMessage(error.code);
-    return { ok: false, error: msg };
+    return { kind: "book", result: { ok: false, error: bookingErrorMessage(error.code) } };
   }
 
   revalidatePath("/");
   revalidatePath("/book");
   revalidatePath("/availability");
   revalidatePath("/my-bookings");
-  return { ok: true, data: { id: (data as { id: string }).id } };
+  return { kind: "book", result: { ok: true, data: { id: (data as { id: string }).id } } };
 }
 
 export async function cancelBooking(
@@ -95,23 +105,13 @@ export async function updateProfile(input: {
   return { ok: true };
 }
 
-export async function getAvailableSlots(
-  date: string,
-): Promise<
-  {
-    sport_id: number;
-    start_time: string;
-    end_time: string;
-    booking_id: string;
-    mine: boolean;
-  }[]
-> {
+async function getAvailableSlotsInternal(date: string): Promise<ActionResult<OccupancyRow[]>> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_slot_occupancy", {
     p_date: date,
   });
-  if (error) return [];
-  return data ?? [];
+  if (error) return { ok: false, error: "Failed to load availability." };
+  return { ok: true, data: data ?? [] };
 }
 
 export async function adminCancelBooking(

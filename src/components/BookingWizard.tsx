@@ -12,8 +12,7 @@ import {
   PartyPopper,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { bookSlot } from "@/app/actions";
-import { getAvailableSlots } from "@/app/actions";
+import { bookingWizard } from "@/app/actions";
 import {
   formatDateDisplay,
   formatTimeDisplay,
@@ -105,8 +104,16 @@ export default function BookingWizard({ sports, initialSportSlug }: Props) {
     setStep(3);
     setLoadingOcc(true);
     setError(null);
-    getAvailableSlots(d)
-      .then(setOccupancy)
+    bookingWizard({ kind: "slots", date: d })
+      .then((r) => {
+        if (r.kind !== "slots") {
+          setError("Failed to load availability.");
+          return;
+        }
+        const result = r.result;
+        if (result.ok && result.data) setOccupancy(result.data);
+        else setError(result.error ?? "Failed to load availability.");
+      })
       .catch(() => setError("Failed to load availability."))
       .finally(() => setLoadingOcc(false));
   }
@@ -121,17 +128,23 @@ export default function BookingWizard({ sports, initialSportSlug }: Props) {
     if (!sport || !date || !time) return;
     setLoading(true);
     setError(null);
-    const result = await bookSlot({
+    const r = await bookingWizard({
+      kind: "book",
       sport_id: sport.id,
       booking_date: date,
       start_time: time,
     });
     setLoading(false);
-    if (result.ok && result.data) {
-      setBookingId(result.data.id);
-      setStep(5);
+    if (r.kind === "book") {
+      const result = r.result;
+      if (result.ok && result.data) {
+        setBookingId(result.data.id);
+        setStep(5);
+      } else {
+        setError(result.error ?? "Something went wrong.");
+      }
     } else {
-      setError(result.error ?? "Something went wrong.");
+      setError("Something went wrong.");
     }
   }
 
