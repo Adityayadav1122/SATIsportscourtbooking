@@ -26,12 +26,16 @@ Create `.env.local` from `.env.example`:
 cp .env.example .env.local
 ```
 
+**Vercel needs only these two** (set in Settings > Environment Variables):
+
 | Variable | Value |
 | -------- | ----- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon (publishable) key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service-role key (server / scripts only) |
-| `SUPABASE_PROJECT_REF` | Project ref (e.g. `lcggirdmbogzsoqhmbyw`) |
+
+`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_MGMT_TOKEN` and `SUPABASE_PROJECT_REF`
+are used by local scripts (`seed.mjs`, `run-sql.mjs`, `check.mjs`) only - keep
+them in `.env.local`, never in Vercel and never in git.
 
 ### Database schema
 
@@ -55,7 +59,7 @@ node scripts/seed.mjs
    https://github.com/Adityayadav1122/SATIsportscourtbooking).
 2. Import the repo at https://vercel.com/new - Vercel auto-detects Next.js.
    Build command: `npm run build`. Node.js 20+.
-3. Add the four environment variables above (Settings > Environment Variables)
+3. Add the two environment variables above (Settings > Environment Variables)
    and redeploy.
 4. Make sure your Supabase project has the migrations applied and the seed run.
 
